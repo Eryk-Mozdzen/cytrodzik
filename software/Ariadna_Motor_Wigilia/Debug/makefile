@@ -12,7 +12,6 @@ RM := rm -rf
 -include Drivers/STM32L4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
--include subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -37,8 +36,8 @@ $(wildcard ../makefile.targets) \
 
 BUILD_ARTIFACT_NAME := Ariadna_Motor_Wigilia
 BUILD_ARTIFACT_EXTENSION := elf
-BUILD_ARTIFACT_PREFIX := 
-BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME).$(BUILD_ARTIFACT_EXTENSION)
+BUILD_ARTIFACT_PREFIX :=
+BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
@@ -61,8 +60,8 @@ all: main-build
 main-build: Ariadna_Motor_Wigilia.elf secondary-outputs
 
 # Tool invocations
-Ariadna_Motor_Wigilia.elf: $(OBJS) $(USER_OBJS) C:\Users\ermoz\STM32CubeIDE\workspace_1.3.0\Ariadna_Motor_Wigilia\STM32L476RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Ariadna_Motor_Wigilia.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\ermoz\STM32CubeIDE\workspace_1.3.0\Ariadna_Motor_Wigilia\STM32L476RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Ariadna_Motor_Wigilia.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Ariadna_Motor_Wigilia.elf: $(OBJS) $(USER_OBJS) /home/emozdzen/Desktop/cytrodzik/software/Ariadna_Motor_Wigilia/STM32L476RGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Ariadna_Motor_Wigilia.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/emozdzen/Desktop/cytrodzik/software/Ariadna_Motor_Wigilia/STM32L476RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Ariadna_Motor_Wigilia.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -83,7 +82,7 @@ Ariadna_Motor_Wigilia.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_
 
 # Other Targets
 clean:
-	-$(RM) *
+	-$(RM) Ariadna_Motor_Wigilia.bin Ariadna_Motor_Wigilia.elf Ariadna_Motor_Wigilia.list default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)
@@ -95,7 +94,6 @@ fail-specified-linker-script-missing:
 warn-no-linker-script-specified:
 	@echo 'Warning: No linker script specified. Check the linker settings in the build configuration.'
 
-.PHONY: all clean dependents fail-specified-linker-script-missing warn-no-linker-script-specified
-.SECONDARY:
+.PHONY: all clean dependents main-build fail-specified-linker-script-missing warn-no-linker-script-specified
 
 -include ../makefile.targets
