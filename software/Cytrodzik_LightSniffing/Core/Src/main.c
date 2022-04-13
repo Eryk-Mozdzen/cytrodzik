@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
+#include "dma.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -48,12 +50,37 @@
 /* USER CODE BEGIN PV */
 
 Motor motors[2];
+uint16_t adc_buffer[1] = {0};
 
 #define MOTOR_L			0
 #define MOTOR_R			1
 
 #define MOTOR_L_DIR		1.f
 #define MOTOR_R_DIR		-1.f
+
+#define SERVO_TIM_COMP_MIN	200
+#define SERVO_TIM_COMP_MAX	400
+
+#define LINE_THRESHOLD		400
+
+#define MOTOR_FORWARD_SPEED	0.0005f
+#define MOTOR_LINE_KP		0.000001f
+
+uint16_t servo_pos = SERVO_TIM_COMP_MIN;
+uint8_t servo_dir = 0;
+
+uint16_t transition_01 = SERVO_TIM_COMP_MIN;
+uint16_t transition_10 = SERVO_TIM_COMP_MAX;
+
+uint8_t prev_line = 0;
+uint8_t curr_line = 0;
+
+float line_setpoint = 300;
+float line_value = 0;
+float line_error = 0;
+
+float motor_l_speed = 0.f;
+float motor_r_speed = 0.f;
 
 /* USER CODE END PV */
 
@@ -65,6 +92,18 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+void calc() {
+	line_value = (transition_01 + transition_10)/2;
+
+	line_error = line_setpoint - line_value;
+
+	motor_l_speed = MOTOR_FORWARD_SPEED - MOTOR_LINE_KP*line_error;
+	motor_r_speed = MOTOR_FORWARD_SPEED + MOTOR_LINE_KP*line_error;
+
+	Motor_SetSpeed(&motors[MOTOR_L], motor_l_speed*MOTOR_L_DIR);
+	Motor_SetSpeed(&motors[MOTOR_R], motor_r_speed*MOTOR_R_DIR);
+}
 
 /* USER CODE END 0 */
 
@@ -97,11 +136,19 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_DMA_Init();
+  MX_ADC1_Init();
   MX_TIM3_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   Motor_Init(&motors[MOTOR_L], &htim3, TIM_CHANNEL_4, GPIOB, GPIO_PIN_8, GPIOB, GPIO_PIN_9);
   Motor_Init(&motors[MOTOR_R], &htim3, TIM_CHANNEL_3, GPIOC, GPIO_PIN_6, GPIOC, GPIO_PIN_5);
+
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc_buffer, 1);
+
+  HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 
   /* USER CODE END 2 */
 
@@ -109,8 +156,57 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while(1) {
 
-	  //Motor_SetSpeed(&motors[MOTOR_L], 1.f*MOTOR_L_DIR);
-	  //Motor_SetSpeed(&motors[MOTOR_R], 1.f*MOTOR_R_DIR);
+	  if(servo_pos<=SERVO_TIM_COMP_MIN) {
+		  servo_dir = 0;
+
+		  /*while(adc_buffer[0]>LINE_THRESHOLD);
+		  while(adc_buffer[0]<LINE_THRESHOLD);
+
+		  calc();*/
+	  }
+
+	  if(servo_pos>=SERVO_TIM_COMP_MAX) {
+		  servo_dir = 1;
+
+		  /*while(adc_buffer[0]>LINE_THRESHOLD);
+		  while(adc_buffer[0]<LINE_THRESHOLD);
+
+		  calc();*/
+	  }
+
+	  if(servo_dir)
+		  servo_pos--;
+	  else
+		  servo_pos++;
+
+	  servo_pos = (servo_pos>SERVO_TIM_COMP_MAX) ? SERVO_TIM_COMP_MAX : servo_pos;
+	  servo_pos = (servo_pos<SERVO_TIM_COMP_MIN) ? SERVO_TIM_COMP_MIN : servo_pos;
+
+	  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, servo_pos);
+
+	  curr_line = (adc_buffer[0]<LINE_THRESHOLD);
+
+	  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, curr_line);
+
+	  if(!prev_line && curr_line) {
+		  transition_01 = servo_pos;
+		  //transition_10 = servo_pos;
+
+		  calc();
+	  } else if(prev_line && !curr_line) {
+		  transition_10 = servo_pos;
+
+		  servo_dir = !servo_dir;
+
+		  calc();
+	  }
+
+	  //HAL_Delay(1);
+
+	  prev_line = curr_line;
+
+	  uint32_t val = 15000;
+	  while(val--);
 
     /* USER CODE END WHILE */
 
